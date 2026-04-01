@@ -54,8 +54,8 @@ type gpmEvent struct {
 	Type      int32
 	Clicks    int32
 	Margin    int32
-	Wdx       uint16
-	Wdy       uint16
+	Wdx       int16
+	Wdy       int16
 }
 
 // Client manages the GPM connection lifecycle.
@@ -202,9 +202,9 @@ func convertEvent(ev *gpmEvent) *tcell.EventMouse {
 
 	// Wheel events: prefer the explicit wdy delta field, fall back to button flags.
 	if ev.Wdy > 0 {
-		btn = tcell.WheelDown
-	} else if ev.Wdy < 0 {
 		btn = tcell.WheelUp
+	} else if ev.Wdy < 0 {
+		btn = tcell.WheelDown
 	} else if ev.Buttons&gpmBDown != 0 {
 		btn = tcell.WheelDown
 	} else if ev.Buttons&gpmBUp != 0 {

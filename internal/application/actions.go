@@ -3,12 +3,14 @@ package application
 import (
 	"dinky/internal/application/filtercommandaction"
 	"dinky/internal/application/settingstype"
+	"dinky/internal/gpm"
 	"dinky/internal/tui/dialog"
 	"dinky/internal/tui/filedialog"
 	"dinky/internal/tui/settingsdialog"
 	"dinky/internal/tui/style"
 	"dinky/internal/utility"
 	"encoding/json"
+	"log"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -17,6 +19,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/gdamore/tcell/v2"
 	"github.com/google/renameio/v2"
 	"github.com/rivo/tview"
 	"github.com/sedwards2009/smidgen"
@@ -681,8 +684,20 @@ func handleSettings() tview.Primitive {
 
 func handleSuspend() tview.Primitive {
 	app.Suspend(func() {
+		// Stop GPM before suspending — the connection goes stale across SIGTSTP.
+		if gpmClient != nil {
+			gpmClient.Stop()
+			gpmClient = nil
+		}
 		// Send SIGTSTP to put the process in the background
 		syscall.Kill(syscall.Getpid(), syscall.SIGTSTP)
+		// Reconnect GPM after the process resumes.
+		if client, err := gpm.Connect(func(ev tcell.Event) { app.QueueEvent(ev) }); err != nil {
+			log.Printf("GPM reconnect failed: %v", err)
+		} else if client != nil {
+			gpmClient = client
+			gpmClient.Start()
+		}
 	})
 	return nil
 }

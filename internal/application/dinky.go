@@ -3,6 +3,7 @@ package application
 import (
 	"bytes"
 	"dinky/internal/application/settingstype"
+	"dinky/internal/gpm"
 	"dinky/internal/tui/findbar"
 	"dinky/internal/tui/menu"
 	"dinky/internal/tui/scrollbar"
@@ -27,7 +28,9 @@ import (
 
 // -----------------------------------------------------------------
 var app *tview.Application
+var gpmClient *gpm.Client
 var enableLogging bool
+var mouseX, mouseY = -1, -1
 var menus []*menu.Menu
 var fileBufferID string
 var tabBarLine *tabbar.TabBar
@@ -486,8 +489,51 @@ func Main() {
 	}
 	selectTab(fileBuffers[0].uuid)
 
+	// Connect to GPM before Run() (handshake happens now; events injected via QueueEvent).
+	if client, err := gpm.Connect(func(ev tcell.Event) {
+		app.QueueEvent(ev)
+		// Pure-move events (ButtonNone) are not consumed by any tview component, so
+		// they don't trigger a redraw on their own. Force one so the cursor updates.
+		if me, ok := ev.(*tcell.EventMouse); ok && me.Buttons() == tcell.ButtonNone {
+			app.QueueUpdateDraw(func() {})
+		}
+	}); err != nil {
+		log.Printf("GPM connect failed (non-fatal): %v", err)
+	} else if client != nil {
+		gpmClient = client
+		gpmClient.Start()
+
+		// Track mouse position in the main goroutine (SetMouseCapture is always
+		// called from the main loop, so mouseX/mouseY are safe to read in afterDraw).
+		app.SetMouseCapture(func(event *tcell.EventMouse, action tview.MouseAction) (*tcell.EventMouse, tview.MouseAction) {
+			mouseX, mouseY = event.Position()
+			return event, action
+		})
+
+		// Chain afterDraw to render a cursor by inverting the cell under the pointer.
+		existingAfterDraw := app.GetAfterDrawFunc()
+		app.SetAfterDrawFunc(func(screen tcell.Screen) {
+			if existingAfterDraw != nil {
+				existingAfterDraw(screen)
+			}
+			if mouseX < 0 || mouseY < 0 {
+				return
+			}
+			w, h := screen.Size()
+			if mouseX >= w || mouseY >= h {
+				return
+			}
+			mainc, combc, cursorStyle, _ := screen.GetContent(mouseX, mouseY)
+			screen.SetContent(mouseX, mouseY, mainc, combc, cursorStyle.Reverse(true))
+		})
+	}
+
 	if err := app.Run(); err != nil {
 		log.Fatalf("Application error: %v", err)
+	}
+
+	if gpmClient != nil {
+		gpmClient.Stop()
 	}
 }
 

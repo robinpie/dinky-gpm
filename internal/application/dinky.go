@@ -523,8 +523,8 @@ func Main() {
 			if mouseX >= w || mouseY >= h {
 				return
 			}
-			mainc, combc, cursorStyle, _ := screen.GetContent(mouseX, mouseY)
-			screen.SetContent(mouseX, mouseY, mainc, combc, cursorStyle.Reverse(true))
+			mainc, combc, _, _ := screen.GetContent(mouseX, mouseY)
+			screen.SetContent(mouseX, mouseY, mainc, combc, tcell.StyleDefault.Background(tcell.ColorYellow).Foreground(tcell.ColorBlack))
 		})
 	}
 

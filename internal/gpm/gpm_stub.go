@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Robin <robin413@protonmail.com>
+// SPDX-License-Identifier: MIT
+
 //go:build !linux
 
 package gpm

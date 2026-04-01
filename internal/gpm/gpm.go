@@ -20,9 +20,7 @@ const (
 
 	// Event type bits (int32 bitmask)
 	gpmMove = 1
-	// gpmDrag = 2 // not currently used
-	// gpmDown = 4 // not currently used
-	// gpmUp   = 8 // not currently used
+	gpmUp   = 8
 
 	// Button bits (uint8)
 	gpmBRight  = 1
@@ -209,6 +207,10 @@ func convertEvent(ev *gpmEvent) *tcell.EventMouse {
 		btn = tcell.WheelDown
 	} else if ev.Buttons&gpmBUp != 0 {
 		btn = tcell.WheelUp
+	} else if ev.Type&gpmUp != 0 {
+		// Button release: send ButtonNone so tview sees the transition from
+		// pressed → released and fires MouseLeftUp / MouseRightUp / etc.
+		btn = tcell.ButtonNone
 	} else {
 		if ev.Buttons&gpmBLeft != 0 {
 			btn |= tcell.Button1
@@ -219,12 +221,6 @@ func convertEvent(ev *gpmEvent) *tcell.EventMouse {
 		if ev.Buttons&gpmBRight != 0 {
 			btn |= tcell.Button3
 		}
-	}
-
-	// For a pure move with no buttons, emit ButtonNone so tview can still
-	// process the position (e.g. hover highlighting).
-	if ev.Type == gpmMove && btn == 0 {
-		btn = tcell.ButtonNone
 	}
 
 	// GPM coordinates are 1-based; tcell uses 0-based.
